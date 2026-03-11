@@ -1,0 +1,426 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <meta name="description" content="A robust, zero-dependency task manager designed for mobile and desktop.">
+    <title>Robust Task Manager</title>
+    <style>
+        :root {
+            --primary: #2563eb;
+            --primary-hover: #1d4ed8;
+            --danger: #ef4444;
+            --danger-hover: #dc2626;
+            --bg: #f8fafc;
+            --surface: #ffffff;
+            --text-main: #0f172a;
+            --text-muted: #64748b;
+            --border: #e2e8f0;
+            --shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06);
+        }
+
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+        }
+
+        body {
+            font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+            background-color: var(--bg);
+            color: var(--text-main);
+            line-height: 1.5;
+            padding: 1rem;
+            /* Prevents issues with mobile keyboards hiding content */
+            padding-bottom: env(safe-area-inset-bottom, 2rem); 
+        }
+
+        .container {
+            max-width: 600px;
+            margin: 0 auto;
+            background-color: var(--surface);
+            border-radius: 12px;
+            box-shadow: var(--shadow);
+            overflow: hidden;
+            display: flex;
+            flex-direction: column;
+            min-height: 60vh;
+        }
+
+        header {
+            padding: 1.5rem;
+            border-bottom: 1px solid var(--border);
+            text-align: center;
+        }
+
+        header h1 {
+            font-size: 1.5rem;
+            font-weight: 600;
+        }
+
+        .input-section {
+            padding: 1.5rem;
+            background-color: var(--surface);
+            border-bottom: 1px solid var(--border);
+            position: sticky;
+            top: 0;
+            z-index: 10;
+        }
+
+        form {
+            display: flex;
+            gap: 0.5rem;
+        }
+
+        input[type="text"] {
+            flex: 1;
+            padding: 0.75rem 1rem;
+            /* 16px font-size prevents iOS auto-zoom on input focus */
+            font-size: 16px; 
+            border: 1px solid var(--border);
+            border-radius: 8px;
+            outline: none;
+            transition: border-color 0.2s;
+            appearance: none;
+        }
+
+        input[type="text"]:focus {
+            border-color: var(--primary);
+            box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.1);
+        }
+
+        button {
+            padding: 0.75rem 1.25rem;
+            font-size: 16px;
+            font-weight: 500;
+            color: white;
+            background-color: var(--primary);
+            border: none;
+            border-radius: 8px;
+            cursor: pointer;
+            transition: background-color 0.2s;
+            appearance: none;
+            touch-action: manipulation;
+        }
+
+        button:hover {
+            background-color: var(--primary-hover);
+        }
+
+        button:active {
+            transform: scale(0.98);
+        }
+
+        .list-section {
+            flex: 1;
+            padding: 1.5rem;
+            overflow-y: auto;
+        }
+
+        ul {
+            list-style: none;
+            display: flex;
+            flex-direction: column;
+            gap: 0.75rem;
+        }
+
+        li {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 1rem;
+            background-color: var(--bg);
+            border: 1px solid var(--border);
+            border-radius: 8px;
+            word-break: break-word;
+        }
+
+        li span {
+            margin-right: 1rem;
+            flex: 1;
+        }
+
+        .delete-btn {
+            background-color: var(--danger);
+            padding: 0.5rem 0.75rem;
+            font-size: 14px;
+        }
+
+        .delete-btn:hover {
+            background-color: var(--danger-hover);
+        }
+
+        .empty-state {
+            text-align: center;
+            color: var(--text-muted);
+            padding: 2rem 0;
+            font-style: italic;
+        }
+
+        /* Mobile specific adjustments */
+        @media (max-width: 480px) {
+            form {
+                flex-direction: column;
+            }
+            button {
+                width: 100%;
+            }
+            .container {
+                min-height: calc(100vh - 2rem);
+            }
+        }
+    </style>
+</head>
+<body>
+
+    <main class="container">
+        <header>
+            <h1>Tasks</h1>
+        </header>
+
+        <section class="input-section">
+            <form id="app-form" aria-label="Add a new task">
+                <input 
+                    type="text" 
+                    id="app-input" 
+                    placeholder="Enter a new task..." 
+                    aria-label="Task description"
+                    autocomplete="off"
+                    maxlength="200"
+                >
+                <button type="submit" id="submit-btn">Add</button>
+            </form>
+        </section>
+
+        <section class="list-section">
+            <ul id="app-list" aria-live="polite">
+                </ul>
+        </section>
+    </main>
+
+    <script>
+        // IIFE to avoid global scope pollution and ensure strict mode execution
+        (function() {
+            'use strict';
+
+            // DOM Elements - Retrieved safely
+            let elements = {};
+
+            // Application State
+            let state = {
+                items: []
+            };
+
+            const STORAGE_KEY = 'app_data_v1';
+
+            /**
+             * Safely initialize application and bind events
+             */
+            function init() {
+                // Defensive DOM queries
+                elements = {
+                    form: document.getElementById('app-form'),
+                    input: document.getElementById('app-input'),
+                    list: document.getElementById('app-list')
+                };
+
+                // Guard clause: ensure critical DOM elements exist to prevent undefined access
+                if (!elements.form || !elements.input || !elements.list) {
+                    console.error('[App Init] Critical DOM elements missing. Execution halted.');
+                    return;
+                }
+
+                loadData();
+                bindEvents();
+                render();
+            }
+
+            /**
+             * Safely load data from localStorage with try/catch
+             */
+            function loadData() {
+                try {
+                    const stored = localStorage.getItem(STORAGE_KEY);
+                    if (stored) {
+                        const parsed = JSON.parse(stored);
+                        // Ensure parsed data is actually an array
+                        if (Array.isArray(parsed)) {
+                            state.items = parsed.filter(item => 
+                                item && typeof item.id === 'number' && typeof item.text === 'string'
+                            );
+                        }
+                    }
+                } catch (error) {
+                    console.warn('[App Storage] Failed to parse local storage, resetting state.', error);
+                    state.items = [];
+                }
+            }
+
+            /**
+             * Safely save data to localStorage with try/catch (handles Private Browsing limits)
+             */
+            function saveData() {
+                try {
+                    localStorage.setItem(STORAGE_KEY, JSON.stringify(state.items || []));
+                } catch (error) {
+                    console.warn('[App Storage] Failed to save to local storage (quota exceeded or disabled).', error);
+                }
+            }
+
+            /**
+             * Bind event listeners defensively
+             */
+            function bindEvents() {
+                // Form submission
+                elements.form.addEventListener('submit', function(event) {
+                    // Always prevent default to stop page reloads
+                    if (event && typeof event.preventDefault === 'function') {
+                        event.preventDefault();
+                    }
+
+                    // Double check input exists
+                    if (!elements.input) return;
+
+                    const rawValue = elements.input.value;
+                    const cleanValue = typeof rawValue === 'string' ? rawValue.trim() : '';
+
+                    if (!cleanValue) {
+                        // Optional: show a visual cue, but returning prevents blank entries safely
+                        return;
+                    }
+
+                    addItem(cleanValue);
+                    
+                    // Reset input safely
+                    try {
+                        elements.input.value = '';
+                        elements.input.focus();
+                    } catch (e) {
+                        console.warn('[App UI] Could not reset or focus input.', e);
+                    }
+                });
+
+                // Event delegation for delete buttons
+                elements.list.addEventListener('click', function(event) {
+                    if (!event || !event.target) return;
+                    
+                    const target = event.target;
+                    
+                    if (target.matches && target.matches('.delete-btn')) {
+                        // Extract ID safely using dataset
+                        const idRaw = target.getAttribute('data-id');
+                        if (!idRaw) return;
+                        
+                        const id = parseInt(idRaw, 10);
+                        if (!isNaN(id)) {
+                            deleteItem(id);
+                        }
+                    }
+                });
+            }
+
+            /**
+             * Add a new item to state
+             */
+            function addItem(text) {
+                if (!text || typeof text !== 'string') return;
+                
+                state.items.push({
+                    id: Date.now(),
+                    text: text
+                });
+                
+                saveData();
+                render();
+            }
+
+            /**
+             * Delete item by ID
+             */
+            function deleteItem(id) {
+                if (typeof id !== 'number') return;
+                
+                state.items = (state.items || []).filter(function(item) {
+                    return item && item.id !== id;
+                });
+                
+                saveData();
+                render();
+            }
+
+            /**
+             * Escape HTML to prevent XSS attacks when rendering text
+             */
+            function escapeHTML(str) {
+                if (typeof str !== 'string') return '';
+                return str
+                    .replace(/&/g, "&amp;")
+                    .replace(/</g, "&lt;")
+                    .replace(/>/g, "&gt;")
+                    .replace(/"/g, "&quot;")
+                    .replace(/'/g, "&#039;");
+            }
+
+            /**
+             * Render state to DOM safely
+             */
+            function render() {
+                if (!elements.list) return;
+
+                // Handle empty state gracefully
+                if (!Array.isArray(state.items) || state.items.length === 0) {
+                    elements.list.innerHTML = '
+No tasks yet. Add one above!
+';
+                    return;
+                }
+
+                // Build HTML string efficiently
+                let html = '';
+                
+                for (let i = 0; i < state.items.length; i++) {
+                    const item = state.items[i];
+                    // Defensive check per item
+                    if (!item || typeof item.text !== 'string' || typeof item.id !== 'number') continue;
+                    
+                    const safeText = escapeHTML(item.text);
+                    const safeId = item.id;
+                    
+                    html += `
+                        <li>
+                            <span>${safeText}</span>
+                            <button 
+                                class="delete-btn" 
+                                data-id="${safeId}"
+                                aria-label="Delete task: ${safeText}"
+                            >
+                                Delete
+                            </button>
+                        </li>
+                    `;
+                }
+
+                // Safely apply to DOM
+                try {
+                    elements.list.innerHTML = html;
+                } catch (error) {
+                    console.error('[App Render] Failed to update DOM.', error);
+                    elements.list.innerHTML = '
+Error rendering tasks.
+';
+                }
+            }
+
+            // Ensure DOM is fully loaded before executing
+            if (document.readyState === 'loading') {
+                document.addEventListener('DOMContentLoaded', init);
+            } else {
+                init();
+            }
+            
+        })();
+    </script>
+</body>
+</html>
+Show quoted text
+
