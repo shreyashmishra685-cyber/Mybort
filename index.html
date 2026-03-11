@@ -1,426 +1,1071 @@
-<!DOCTYPE html>
+<!doctype html>
 <html lang="en">
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <meta name="description" content="A robust, zero-dependency task manager designed for mobile and desktop.">
-    <title>Robust Task Manager</title>
-    <style>
-        :root {
-            --primary: #2563eb;
-            --primary-hover: #1d4ed8;
-            --danger: #ef4444;
-            --danger-hover: #dc2626;
-            --bg: #f8fafc;
-            --surface: #ffffff;
-            --text-main: #0f172a;
-            --text-muted: #64748b;
-            --border: #e2e8f0;
-            --shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06);
-        }
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover" />
+  <title>Universal AI Chat Interface — Zero Build</title>
 
-        * {
-            box-sizing: border-box;
-            margin: 0;
-            padding: 0;
-        }
+  <!-- Tailwind via CDN (allowed) -->
+  <script src="https://cdn.tailwindcss.com"></script>
 
-        body {
-            font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
-            background-color: var(--bg);
-            color: var(--text-main);
-            line-height: 1.5;
-            padding: 1rem;
-            /* Prevents issues with mobile keyboards hiding content */
-            padding-bottom: env(safe-area-inset-bottom, 2rem); 
-        }
+  <!-- Marked.js for Markdown rendering -->
+  <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
 
-        .container {
-            max-width: 600px;
-            margin: 0 auto;
-            background-color: var(--surface);
-            border-radius: 12px;
-            box-shadow: var(--shadow);
-            overflow: hidden;
-            display: flex;
-            flex-direction: column;
-            min-height: 60vh;
-        }
+  <style>
+    /* Extra small visual tweaks and safe area support */
+    :root{
+      --bg: #f7f7f9;
+      --panel: #ffffff;
+      --muted: #6b7280;
+      --accent: #6b21a8; /* violet-ish Gemini vibe */
+      --ai-bg: #eef2ff;
+      --user-bg: #dcfce7;
+    }
+    [data-theme="dark"]{
+      --bg: #0b1020;
+      --panel: #0b1220;
+      --muted: #9ca3af;
+      --accent: #7c3aed;
+      --ai-bg: #071034;
+      --user-bg: #052014;
+      color-scheme: dark;
+    }
 
-        header {
-            padding: 1.5rem;
-            border-bottom: 1px solid var(--border);
-            text-align: center;
-        }
+    html,body,#app{
+      height: 100%;
+    }
 
-        header h1 {
-            font-size: 1.5rem;
-            font-weight: 600;
-        }
+    body{
+      margin:0;
+      font-family: Inter, ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial;
+      background: var(--bg);
+      -webkit-font-smoothing:antialiased;
+      -moz-osx-font-smoothing:grayscale;
+    }
 
-        .input-section {
-            padding: 1.5rem;
-            background-color: var(--surface);
-            border-bottom: 1px solid var(--border);
-            position: sticky;
-            top: 0;
-            z-index: 10;
-        }
+    /* Loader fallback - visible until script initialises */
+    #loading{
+      display:flex;
+      align-items:center;
+      justify-content:center;
+      height:100vh;
+      width:100vw;
+      background:linear-gradient(180deg, rgba(255,255,255,0.6), rgba(250,250,250,0.9));
+      position:fixed;
+      inset:0;
+      z-index:60;
+      font-weight:600;
+      color:#111827;
+    }
 
-        form {
-            display: flex;
-            gap: 0.5rem;
-        }
+    /* Scrollbar minimal */
+    .scroll-y::-webkit-scrollbar{ height:10px; width:10px;}
+    .scroll-y::-webkit-scrollbar-thumb{ background:rgba(0,0,0,0.12); border-radius:999px;}
 
-        input[type="text"] {
-            flex: 1;
-            padding: 0.75rem 1rem;
-            /* 16px font-size prevents iOS auto-zoom on input focus */
-            font-size: 16px; 
-            border: 1px solid var(--border);
-            border-radius: 8px;
-            outline: none;
-            transition: border-color 0.2s;
-            appearance: none;
-        }
+    /* Chat bubble max width */
+    .msg-bubble{ max-width:78%; white-space:pre-wrap; word-break:break-word; }
 
-        input[type="text"]:focus {
-            border-color: var(--primary);
-            box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.1);
-        }
+    /* Markdown code block styling */
+    pre {
+      background: rgba(0,0,0,0.04);
+      padding: 12px;
+      border-radius: 8px;
+      overflow:auto;
+    }
+    [data-theme="dark"] pre { background: rgba(255,255,255,0.03); }
 
-        button {
-            padding: 0.75rem 1.25rem;
-            font-size: 16px;
-            font-weight: 500;
-            color: white;
-            background-color: var(--primary);
-            border: none;
-            border-radius: 8px;
-            cursor: pointer;
-            transition: background-color 0.2s;
-            appearance: none;
-            touch-action: manipulation;
-        }
+    /* small helper for input safe area */
+    .safe-bottom { padding-bottom: env(safe-area-inset-bottom); }
 
-        button:hover {
-            background-color: var(--primary-hover);
-        }
+    /* Tiny transition for sidebar slide */
+    .sidebar-mobile-slide { transform: translateX(-100%); transition: transform .22s ease; }
+    .sidebar-mobile-slide.open { transform: translateX(0); }
 
-        button:active {
-            transform: scale(0.98);
-        }
-
-        .list-section {
-            flex: 1;
-            padding: 1.5rem;
-            overflow-y: auto;
-        }
-
-        ul {
-            list-style: none;
-            display: flex;
-            flex-direction: column;
-            gap: 0.75rem;
-        }
-
-        li {
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-            padding: 1rem;
-            background-color: var(--bg);
-            border: 1px solid var(--border);
-            border-radius: 8px;
-            word-break: break-word;
-        }
-
-        li span {
-            margin-right: 1rem;
-            flex: 1;
-        }
-
-        .delete-btn {
-            background-color: var(--danger);
-            padding: 0.5rem 0.75rem;
-            font-size: 14px;
-        }
-
-        .delete-btn:hover {
-            background-color: var(--danger-hover);
-        }
-
-        .empty-state {
-            text-align: center;
-            color: var(--text-muted);
-            padding: 2rem 0;
-            font-style: italic;
-        }
-
-        /* Mobile specific adjustments */
-        @media (max-width: 480px) {
-            form {
-                flex-direction: column;
-            }
-            button {
-                width: 100%;
-            }
-            .container {
-                min-height: calc(100vh - 2rem);
-            }
-        }
-    </style>
+    /* typing cursor style */
+    .typing-cursor::after{
+      content: "";
+      display:inline-block;
+      width:10px;
+      height:14px;
+      margin-left:6px;
+      background:linear-gradient(90deg, transparent, rgba(0,0,0,0.4));
+      animation: blink 1s steps(2, start) infinite;
+      vertical-align: middle;
+      border-radius:2px;
+    }
+    @keyframes blink{ 50% { opacity:0 } }
+  </style>
 </head>
 <body>
+  <!-- Fallback loader - must be visible until JS initialises -->
+  <div id="loading">Loading App...</div>
 
-    <main class="container">
-        <header>
-            <h1>Tasks</h1>
-        </header>
+  <!-- App root - hidden by JS until initialisation completes -->
+  <div id="app" class="min-h-screen flex" style="display:none;" aria-hidden="true" role="application">
 
-        <section class="input-section">
-            <form id="app-form" aria-label="Add a new task">
-                <input 
-                    type="text" 
-                    id="app-input" 
-                    placeholder="Enter a new task..." 
-                    aria-label="Task description"
-                    autocomplete="off"
-                    maxlength="200"
-                >
-                <button type="submit" id="submit-btn">Add</button>
-            </form>
-        </section>
+    <!-- Sidebar -->
+    <aside id="sidebar" class="z-40 w-80 max-w-[80%] bg-white border-r border-gray-200 dark:bg-[#07122a] dark:border-gray-800 p-3 hidden md:flex flex-col">
+      <div class="flex items-center justify-between mb-3">
+        <div class="flex items-center gap-2">
+          <button id="newChatBtn" class="px-3 py-1 rounded-md bg-gradient-to-r from-violet-600 to-indigo-600 text-white text-sm">+ New chat</button>
+          <h2 class="text-sm font-semibold" id="appTitle">Universal AI</h2>
+        </div>
+        <div class="flex items-center gap-2">
+          <button id="toggleThemeMd" title="Toggle dark mode" class="p-2 rounded-md hover:bg-gray-100 dark:hover:bg-gray-900">
+            <!-- sun/moon icon toggled by JS -->
+            <svg id="themeIconMd" xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 3v1m0 16v1m8.66-11H21M3 12h1m15.36 6.36l-.7.7M6.34 6.34l-.7.7m12.02 12.02l-.7-.7M6.34 17.66l-.7-.7" /></svg>
+          </button>
+          <button id="openSettingsMd" title="Settings" class="p-2 rounded-md hover:bg-gray-100 dark:hover:bg-gray-900">
+            <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11.049 2.927c.3-.921 1.603-.921 1.902 0a1.724 1.724 0 002.516 1.051c.83-.49 1.845.27 1.545 1.19a1.724 1.724 0 001.06 2.07c.94.36.94 1.72 0 2.08a1.724 1.724 0 00-1.06 2.07c.3.92-.715 1.68-1.545 1.19a1.724 1.724 0 00-2.516 1.05c-.3.92-1.603.92-1.902 0a1.724 1.724 0 00-2.516-1.05c-.83.49-1.845-.27-1.545-1.19a1.724 1.724 0 00-1.06-2.07c-.94-.36-.94-1.72 0-2.08a1.724 1.724 0 001.06-2.07c-.3-.92.715-1.68 1.545-1.19.97.57 1.98-.17 2.516-1.05z" /></svg>
+          </button>
+        </div>
+      </div>
 
-        <section class="list-section">
-            <ul id="app-list" aria-live="polite">
-                </ul>
-        </section>
+      <div class="flex-1 overflow-y-auto scroll-y">
+        <div id="chatsList" class="flex flex-col gap-2"></div>
+      </div>
+
+      <div class="mt-3 border-t pt-3 text-xs text-gray-500 dark:text-gray-400">
+        <div class="flex items-center justify-between">
+          <div>Model</div>
+          <div id="sidebarModel" class="text-sm font-mono"></div>
+        </div>
+        <div class="mt-2">
+          <button id="importChats" class="text-xs px-2 py-1 rounded bg-gray-100 dark:bg-gray-800">Export</button>
+          <button id="exportChats" class="text-xs px-2 py-1 rounded bg-gray-100 dark:bg-gray-800 ml-2">Import</button>
+        </div>
+      </div>
+    </aside>
+
+    <!-- Mobile sidebar slide -->
+    <div id="sidebarMobile" class="fixed inset-y-0 left-0 z-50 md:hidden sidebar-mobile-slide bg-white border-r dark:bg-[#07122a] dark:border-gray-800 p-3 w-72 safe-bottom" aria-hidden="true">
+      <div class="flex items-center justify-between mb-3">
+        <div class="flex items-center gap-2">
+          <button id="newChatBtnMob" class="px-3 py-1 rounded-md bg-gradient-to-r from-violet-600 to-indigo-600 text-white text-sm">+ New</button>
+          <h2 class="text-sm font-semibold">Chats</h2>
+        </div>
+        <div>
+          <button id="closeSidebarMobile" class="p-2 rounded-md"><svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/></svg></button>
+        </div>
+      </div>
+      <div class="flex-1 overflow-y-auto scroll-y">
+        <div id="chatsListMobile" class="flex flex-col gap-2"></div>
+      </div>
+      <div class="mt-3">
+        <button id="openSettingsMob" class="w-full text-left text-sm px-3 py-2 rounded-md hover:bg-gray-100 dark:hover:bg-gray-900">Settings</button>
+      </div>
+    </div>
+
+    <!-- Main content -->
+    <main id="mainArea" class="flex-1 flex flex-col min-h-screen">
+      <!-- Top bar -->
+      <header class="flex items-center justify-between px-4 py-3 border-b bg-white dark:bg-[#061025] dark:border-gray-800">
+        <div class="flex items-center gap-3">
+          <button id="hamburger" class="md:hidden p-2 rounded-md" title="Open chats">
+            <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 12h16M4 18h16"/></svg>
+          </button>
+          <h1 id="chatTitle" class="text-base font-semibold">Welcome</h1>
+        </div>
+
+        <div class="flex items-center gap-3">
+          <div id="currentSystemPromptPill" class="text-sm text-gray-500 dark:text-gray-400"></div>
+          <button id="renameChat" title="Rename chat" class="p-2 rounded-md hover:bg-gray-100 dark:hover:bg-gray-900"><svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15.232 5.232l3.536 3.536M9 11l6-6L20 4l-11 11H4v-5l5-5z"/></svg></button>
+          <button id="deleteChat" title="Delete chat" class="p-2 rounded-md hover:bg-gray-100 dark:hover:bg-gray-900"><svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5-4h4a1 1 0 011 1v1H9V4a1 1 0 011-1z"/></svg></button>
+        </div>
+      </header>
+
+      <!-- Chat messages area -->
+      <section id="messagesWrap" class="flex-1 overflow-y-auto scroll-y p-4 bg-white dark:bg-[#061025]" tabindex="0" aria-live="polite">
+        <div id="messages" class="flex flex-col gap-4 max-w-3xl mx-auto"></div>
+      </section>
+
+      <!-- Input bar - always visible and safe for mobile keyboards -->
+      <div class="bg-white dark:bg-[#071225] border-t p-3 safe-bottom" style="position:sticky; bottom:0; z-index:40;">
+        <div class="max-w-3xl mx-auto flex items-center gap-3">
+          <textarea id="inputBox" rows="1" placeholder="Type your message..." class="flex-1 resize-none min-h-[44px] max-h-48 p-3 rounded-lg border border-gray-200 dark:border-gray-800 bg-white dark:bg-[#061225] text-sm focus:outline-none"></textarea>
+          <div class="flex items-center gap-2">
+            <button id="sendBtn" class="px-4 py-2 rounded-lg bg-gradient-to-r from-violet-600 to-indigo-600 text-white">Send</button>
+            <button id="stopBtn" class="px-3 py-2 rounded-lg bg-red-50 text-red-600 hidden">Stop</button>
+          </div>
+        </div>
+      </div>
     </main>
 
-    <script>
-        // IIFE to avoid global scope pollution and ensure strict mode execution
-        (function() {
-            'use strict';
+    <!-- Settings Modal -->
+    <div id="settingsModal" class="fixed inset-0 z-50 hidden items-center justify-center p-4">
+      <div class="absolute inset-0 bg-black/40" id="settingsBack"></div>
+      <div class="relative w-full max-w-2xl bg-white dark:bg-[#07122a] rounded-lg shadow-xl p-4">
+        <div class="flex items-center justify-between mb-4">
+          <h3 class="text-lg font-semibold">Settings</h3>
+          <button id="closeSettings" class="p-2 rounded-md">✕</button>
+        </div>
 
-            // DOM Elements - Retrieved safely
-            let elements = {};
+        <div class="space-y-4">
+          <div>
+            <label class="block text-sm font-medium text-gray-700 dark:text-gray-300">OpenRouter API Key</label>
+            <input id="apiKeyInput" type="password" placeholder="sk-xxxxx" class="mt-1 block w-full p-2 border rounded-md bg-gray-50 dark:bg-[#04101d] dark:border-gray-800" />
+            <div class="text-xs text-gray-500 mt-1">Stored locally in your browser only.</div>
+          </div>
 
-            // Application State
-            let state = {
-                items: []
-            };
+          <div>
+            <label class="block text-sm font-medium text-gray-700 dark:text-gray-300">Model name</label>
+            <input id="modelInput" type="text" placeholder="deepseek/deepseek-r1:free" class="mt-1 block w-full p-2 border rounded-md bg-gray-50 dark:bg-[#04101d] dark:border-gray-800" />
+          </div>
 
-            const STORAGE_KEY = 'app_data_v1';
+          <div>
+            <label class="block text-sm font-medium text-gray-700 dark:text-gray-300">Global System Prompt</label>
+            <textarea id="globalSystemPrompt" rows="3" class="mt-1 block w-full p-2 border rounded-md bg-gray-50 dark:bg-[#04101d] dark:border-gray-800"></textarea>
+            <div class="flex gap-2 mt-2">
+              <button id="saveSettings" class="px-3 py-1 rounded bg-indigo-600 text-white">Save</button>
+              <button id="clearApi" class="px-3 py-1 rounded bg-gray-100 dark:bg-gray-800">Clear API Key</button>
+            </div>
+          </div>
 
-            /**
-             * Safely initialize application and bind events
-             */
-            function init() {
-                // Defensive DOM queries
-                elements = {
-                    form: document.getElementById('app-form'),
-                    input: document.getElementById('app-input'),
-                    list: document.getElementById('app-list')
-                };
+          <div class="flex items-center justify-between">
+            <div>
+              <label class="text-sm text-gray-700 dark:text-gray-200">Dark Mode</label>
+              <div class="text-xs text-gray-500">Preference saved locally</div>
+            </div>
+            <div>
+              <button id="toggleTheme" class="px-3 py-1 rounded bg-gray-100 dark:bg-gray-800">Toggle</button>
+            </div>
+          </div>
 
-                // Guard clause: ensure critical DOM elements exist to prevent undefined access
-                if (!elements.form || !elements.input || !elements.list) {
-                    console.error('[App Init] Critical DOM elements missing. Execution halted.');
-                    return;
+          <div class="flex justify-end gap-2">
+            <button id="closeSettings2" class="px-3 py-1 rounded bg-gray-100 dark:bg-gray-800">Close</button>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Inline rename prompt (hidden) -->
+    <div id="renamePrompt" class="fixed inset-0 hidden items-center justify-center z-50 p-4">
+      <div class="absolute inset-0 bg-black/30"></div>
+      <div class="relative w-full max-w-md bg-white dark:bg-[#07122a] p-4 rounded shadow">
+        <h4 class="font-semibold mb-2">Rename chat</h4>
+        <input id="renameInput" class="w-full p-2 rounded border bg-gray-50 dark:bg-[#04101d] dark:border-gray-800" />
+        <div class="flex justify-end gap-2 mt-3">
+          <button id="renameCancel" class="px-3 py-1 rounded bg-gray-100 dark:bg-gray-800">Cancel</button>
+          <button id="renameSave" class="px-3 py-1 rounded bg-indigo-600 text-white">Save</button>
+        </div>
+      </div>
+    </div>
+
+  </div>
+
+  <!-- SINGLE script tag at the VERY END of body -->
+  <script>
+  (function(){
+    'use strict';
+
+    // Defensive guards
+    const $ = (sel, root=document) => root.querySelector(sel);
+    const $$ = (sel, root=document) => Array.from(root.querySelectorAll(sel));
+
+    // Elements
+    const loading = document.getElementById('loading');
+    const app = document.getElementById('app');
+    const sidebar = document.getElementById('sidebar');
+    const sidebarMobile = document.getElementById('sidebarMobile');
+    const chatsList = document.getElementById('chatsList');
+    const chatsListMobile = document.getElementById('chatsListMobile');
+    const messagesEl = document.getElementById('messages');
+    const messagesWrap = document.getElementById('messagesWrap');
+    const inputBox = document.getElementById('inputBox');
+    const sendBtn = document.getElementById('sendBtn');
+    const stopBtn = document.getElementById('stopBtn');
+    const newChatBtn = document.getElementById('newChatBtn');
+    const newChatBtnMob = document.getElementById('newChatBtnMob');
+    const hamburger = document.getElementById('hamburger');
+    const closeSidebarMobile = document.getElementById('closeSidebarMobile');
+    const openSettingsMd = document.getElementById('openSettingsMd');
+    const openSettingsMob = document.getElementById('openSettingsMob');
+    const settingsModal = document.getElementById('settingsModal');
+    const settingsBack = document.getElementById('settingsBack');
+    const closeSettings = document.getElementById('closeSettings');
+    const closeSettings2 = document.getElementById('closeSettings2');
+    const apiKeyInput = document.getElementById('apiKeyInput');
+    const modelInput = document.getElementById('modelInput');
+    const globalSystemPromptEl = document.getElementById('globalSystemPrompt');
+    const saveSettings = document.getElementById('saveSettings');
+    const clearApi = document.getElementById('clearApi');
+    const toggleTheme = document.getElementById('toggleTheme');
+    const toggleThemeMd = document.getElementById('toggleThemeMd');
+    const themeIconMd = document.getElementById('themeIconMd');
+    const appTitle = document.getElementById('appTitle');
+    const sidebarModel = document.getElementById('sidebarModel');
+    const chatTitle = document.getElementById('chatTitle');
+    const renameChatBtn = document.getElementById('renameChat') || document.getElementById('renameChat');
+    const deleteChatBtn = document.getElementById('deleteChat');
+    const currentSystemPromptPill = document.getElementById('currentSystemPromptPill');
+    const renamePrompt = document.getElementById('renamePrompt');
+    const renameInput = document.getElementById('renameInput');
+    const renameCancel = document.getElementById('renameCancel');
+    const renameSave = document.getElementById('renameSave');
+    const exportChatsBtn = document.getElementById('exportChats');
+    const importChatsBtn = document.getElementById('importChats');
+
+    // State
+    let state = {
+      apiKey: '',
+      model: 'deepseek/deepseek-r1:free',
+      dark: false,
+      chats: [], // {id, title, messages:[{role,content}], systemPrompt}
+      activeChatId: null,
+      globalSystemPrompt: '',
+      streamingController: null,
+    };
+
+    // Utilities
+    const uid = (n=8) => Math.random().toString(36).slice(2, 2+n);
+    const nowISO = () => new Date().toISOString();
+
+    // Localstorage keys
+    const LS = {
+      apiKey: 'ur_api_key_v1',
+      model: 'ur_model_v1',
+      dark: 'ur_theme_v1',
+      chats: 'ur_chats_v1',
+      globalSystem: 'ur_global_sys_v1',
+    };
+
+    function saveStateToStorage(){
+      try{
+        localStorage.setItem(LS.chats, JSON.stringify(state.chats || []));
+        localStorage.setItem(LS.apiKey, state.apiKey || '');
+        localStorage.setItem(LS.model, state.model || '');
+        localStorage.setItem(LS.dark, state.dark ? '1':'0');
+        localStorage.setItem(LS.globalSystem, state.globalSystem || '');
+      }catch(e){
+        console.warn('Storage save failed', e);
+      }
+    }
+    function loadStateFromStorage(){
+      try{
+        const a = localStorage.getItem(LS.apiKey);
+        const m = localStorage.getItem(LS.model);
+        const d = localStorage.getItem(LS.dark);
+        const chats = localStorage.getItem(LS.chats);
+        const g = localStorage.getItem(LS.globalSystem);
+        state.apiKey = a || '';
+        state.model = m || state.model;
+        state.dark = (d === '1');
+        state.chats = chats ? JSON.parse(chats) : [];
+        state.globalSystem = g || '';
+      }catch(e){
+        console.warn('Storage load failed', e);
+      }
+    }
+
+    // Initialize
+    function init(){
+      try{
+        loadStateFromStorage();
+
+        // Theme
+        applyTheme(state.dark);
+
+        // Populate inputs with saved values
+        apiKeyInput.value = state.apiKey || '';
+        modelInput.value = state.model || '';
+        globalSystemPromptEl.value = state.globalSystem || '';
+
+        sidebarModel.textContent = state.model;
+
+        // If no chats, create default welcome chat
+        if(!state.chats || !state.chats.length){
+          const id = uid(6);
+          const welcomeChat = {
+            id,
+            title: 'Welcome',
+            systemPrompt: '',
+            messages: [
+              {role:'assistant', content: 'Hello! I am your Universal AI. Type a message and hit Send. Use Settings to provide your OpenRouter API key and model.'}
+            ]
+          };
+          state.chats = [welcomeChat];
+          state.activeChatId = id;
+          saveStateToStorage();
+        }else{
+          // Ensure activeChatId is present
+          state.activeChatId = state.chats[0].id;
+        }
+
+        // Render UI
+        renderChats();
+        renderActiveChat();
+
+        bindEvents();
+
+        // Show app and hide loader
+        app.style.display = '';
+        app.removeAttribute('aria-hidden');
+        loading.style.display = 'none';
+      }catch(e){
+        console.error('Initialization error', e);
+        loading.textContent = 'Failed to load app — open console for details.';
+      }
+    }
+
+    // Theme functions
+    function applyTheme(dark){
+      state.dark = !!dark;
+      if(state.dark){
+        document.documentElement.setAttribute('data-theme','dark');
+      }else{
+        document.documentElement.removeAttribute('data-theme');
+      }
+      // adjust icon (simple)
+      if(themeIconMd){
+        themeIconMd.innerHTML = state.dark ?
+          '<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d=\"M12 3v1m0 16v1m8.66-11H21M3 12h1m15.36 6.36l-.7.7M6.34 6.34l-.7.7m12.02 12.02l-.7-.7M6.34 17.66l-.7-.7\" />' :
+          '<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d=\"M12 3v1m0 16v1m8.66-11H21M3 12h1m15.36 6.36l-.7.7M6.34 6.34l-.7.7m12.02 12.02l-.7-.7M6.34 17.66l-.7-.7\" />';
+      }
+      saveStateToStorage();
+    }
+
+    // Bind UI events
+    function bindEvents(){
+      // Send
+      sendBtn.addEventListener('click', onSend);
+      inputBox.addEventListener('keydown', (e) => {
+        if(e.key === 'Enter' && !e.shiftKey){
+          e.preventDefault();
+          onSend();
+        }
+      });
+
+      // Stop streaming
+      stopBtn.addEventListener('click', () => {
+        if(state.streamingController){
+          try{ state.streamingController.abort(); }catch(e){}
+          state.streamingController = null;
+        }
+        stopBtn.classList.add('hidden');
+      });
+
+      // New chat
+      newChatBtn.addEventListener('click', createChat);
+      newChatBtnMob.addEventListener('click', () => { createChat(); toggleSidebarMobile(false); });
+
+      // Sidebar mobile toggles
+      hamburger.addEventListener('click', ()=> toggleSidebarMobile(true));
+      closeSidebarMobile.addEventListener('click', ()=> toggleSidebarMobile(false));
+
+      // Settings open/close
+      openSettingsMd.addEventListener('click', () => openSettings());
+      openSettingsMob.addEventListener('click', () => { openSettings(); toggleSidebarMobile(false); });
+      closeSettings.addEventListener('click', closeSettingsModal);
+      closeSettings2.addEventListener('click', closeSettingsModal);
+      settingsBack.addEventListener('click', closeSettingsModal);
+
+      saveSettings.addEventListener('click', () => {
+        state.apiKey = apiKeyInput.value.trim();
+        state.model = modelInput.value.trim() || state.model;
+        state.globalSystem = globalSystemPromptEl.value || '';
+        sidebarModel.textContent = state.model;
+        saveStateToStorage();
+        closeSettingsModal();
+      });
+
+      clearApi.addEventListener('click', () => {
+        apiKeyInput.value = '';
+        state.apiKey = '';
+        saveStateToStorage();
+        alert('API key cleared from local storage.');
+      });
+
+      toggleTheme.addEventListener('click', ()=> { applyTheme(!state.dark); });
+      toggleThemeMd.addEventListener('click', ()=> { applyTheme(!state.dark); });
+
+      // Rename / delete
+      renameSave.addEventListener('click', handleRenameSave);
+      renameCancel.addEventListener('click', ()=> renamePrompt.classList.add('hidden'));
+      renameChatBtn.addEventListener('click', ()=> openRenamePrompt());
+      deleteChatBtn.addEventListener('click', ()=> {
+        if(confirm('Delete this chat? This cannot be undone.')){
+          deleteActiveChat();
+        }
+      });
+
+      // export/import
+      exportChatsBtn.addEventListener('click', exportChats);
+      importChatsBtn.addEventListener('click', importChats);
+
+      // Clicking outside mobile sidebar closes it
+      window.addEventListener('resize', () => {
+        if(window.innerWidth >= 768){
+          toggleSidebarMobile(false, true);
+        }
+      });
+    }
+
+    // Sidebar mobile toggler
+    function toggleSidebarMobile(show, force=false){
+      if(!sidebarMobile) return;
+      if(show) {
+        sidebarMobile.classList.add('open');
+        sidebarMobile.classList.remove('sidebar-mobile-slide');
+        document.body.style.overflow = 'hidden';
+      } else {
+        sidebarMobile.classList.remove('open');
+        sidebarMobile.classList.add('sidebar-mobile-slide');
+        document.body.style.overflow = '';
+      }
+    }
+
+    // Chat CRUD
+    function createChat(){
+      const id = uid(6);
+      const title = 'New chat';
+      const chat = { id, title, systemPrompt: '', messages: [] };
+      state.chats.unshift(chat);
+      state.activeChatId = id;
+      saveStateToStorage();
+      renderChats();
+      renderActiveChat();
+      // Focus input
+      setTimeout(()=> inputBox.focus(), 100);
+    }
+    function deleteActiveChat(){
+      if(!state.activeChatId) return;
+      const idx = state.chats.findIndex(c => c.id === state.activeChatId);
+      if(idx >= 0){
+        state.chats.splice(idx, 1);
+        if(state.chats.length){
+          state.activeChatId = state.chats[0].id;
+        }else{
+          // create initial
+          const id = uid(6);
+          state.chats = [{ id, title: 'Welcome', systemPrompt:'', messages:[{role:'assistant',content:'New conversation started.'}] }];
+          state.activeChatId = id;
+        }
+        saveStateToStorage();
+        renderChats();
+        renderActiveChat();
+      }
+    }
+    function renameActiveChat(newTitle){
+      const chat = state.chats.find(c => c.id === state.activeChatId);
+      if(!chat) return;
+      chat.title = newTitle || chat.title;
+      saveStateToStorage();
+      renderChats();
+      renderActiveChat();
+    }
+    function openRenamePrompt(){
+      const chat = state.chats.find(c => c.id === state.activeChatId);
+      if(!chat) return;
+      renameInput.value = chat.title || '';
+      renamePrompt.classList.remove('hidden');
+      renameInput.focus();
+    }
+    function handleRenameSave(){
+      const v = renameInput.value.trim();
+      if(!v) return alert('Please enter a chat name.');
+      renameActiveChat(v);
+      renamePrompt.classList.add('hidden');
+    }
+
+    // Export / Import chats
+    function exportChats(){
+      try{
+        const data = JSON.stringify(state.chats, null, 2);
+        const blob = new Blob([data], {type:'application/json'});
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = 'chats.json';
+        document.body.appendChild(a);
+        a.click();
+        a.remove();
+      }catch(e){
+        alert('Export failed: ' + String(e));
+      }
+    }
+    function importChats(){
+      const inp = document.createElement('input');
+      inp.type = 'file';
+      inp.accept = 'application/json';
+      inp.onchange = (ev) => {
+        const file = ev.target.files && ev.target.files[0];
+        if(!file) return;
+        const reader = new FileReader();
+        reader.onload = (e) => {
+          try{
+            const data = JSON.parse(e.target.result);
+            if(Array.isArray(data)){
+              // basic validation
+              state.chats = data.slice().map(c => ({
+                id: c.id || uid(6),
+                title: c.title || 'Imported',
+                systemPrompt: c.systemPrompt || '',
+                messages: Array.isArray(c.messages) ? c.messages.slice() : []
+              }));
+              state.activeChatId = state.chats[0]?.id || null;
+              saveStateToStorage();
+              renderChats();
+              renderActiveChat();
+              alert('Imported chats.');
+            }else alert('Invalid file: expected an array of chats.');
+          }catch(err){
+            alert('Import error: ' + err.message);
+          }
+        };
+        reader.readAsText(file);
+      };
+      inp.click();
+    }
+
+    // Render chat list
+    function renderChats(){
+      // Clear
+      chatsList.innerHTML = '';
+      chatsListMobile.innerHTML = '';
+
+      state.chats.forEach(chat => {
+        const item = document.createElement('div');
+        item.className = 'flex items-center justify-between p-2 rounded hover:bg-gray-50 dark:hover:bg-gray-900 cursor-pointer';
+        item.innerHTML = `<div class="flex items-center gap-2">
+          <div class="w-9 h-9 rounded-full bg-gradient-to-tr from-violet-500 to-indigo-500 text-white flex items-center justify-center text-sm font-semibold">${(chat.title||'?').slice(0,1)}</div>
+          <div>
+            <div class="text-sm font-medium">${escapeHtml(chat.title||'Untitled')}</div>
+            <div class="text-xs text-gray-500 dark:text-gray-400">${chat.messages?.length || 0} messages · ${chat.systemPrompt ? 'system' : 'no system'}</div>
+          </div>
+        </div>
+        <div class="text-xs text-gray-400">...</div>`;
+
+        item.addEventListener('click', ()=>{
+          state.activeChatId = chat.id;
+          renderChats();
+          renderActiveChat();
+          toggleSidebarMobile(false);
+        });
+
+        chatsList.appendChild(item);
+
+        // Mobile list item (clone)
+        const mob = item.cloneNode(true);
+        mob.addEventListener('click', ()=>{
+          state.activeChatId = chat.id;
+          renderChats();
+          renderActiveChat();
+          toggleSidebarMobile(false);
+        });
+        chatsListMobile.appendChild(mob);
+      });
+    }
+
+    // Utility: escape html
+    function escapeHtml(str){
+      if(!str) return '';
+      return String(str).replace(/[&<>"']/g, s => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[s]));
+    }
+
+    // Render active chat
+    function renderActiveChat(){
+      const chat = state.chats.find(c => c.id === state.activeChatId);
+      if(!chat) return;
+      chatTitle.textContent = chat.title || 'Untitled';
+      currentSystemPromptPill.textContent = chat.systemPrompt ? 'System: ' + (chat.systemPrompt.slice(0,60) + (chat.systemPrompt.length>60?'…':'')) : (state.globalSystem ? 'Global System Prompt' : '');
+      // messages
+      messagesEl.innerHTML = '';
+      (chat.messages || []).forEach((m, idx) => {
+        appendMessageToDOM(m.role, m.content, {id: idx, existing:true});
+      });
+      // scroll to bottom
+      setTimeout(()=> scrollToBottom(true), 0);
+    }
+
+    // Append a message DOM element; returns the element
+    function appendMessageToDOM(role, content, opts={}){
+      // opts: {id, existing}
+      const wrap = document.createElement('div');
+      wrap.className = 'flex';
+      if(role === 'user'){
+        wrap.classList.add('justify-end');
+      }else{
+        wrap.classList.add('justify-start');
+      }
+
+      const bubble = document.createElement('div');
+      bubble.className = 'msg-bubble p-3 rounded-lg';
+      bubble.style.wordBreak = 'break-word';
+      bubble.style.whiteSpace = 'pre-wrap';
+      bubble.setAttribute('data-role', role);
+
+      if(role === 'user'){
+        bubble.classList.add('bg-green-50','dark:bg-[#063017]');
+        bubble.style.borderRadius = '12px';
+        bubble.style.textAlign = 'right';
+      }else{
+        bubble.classList.add('bg-[#f0f7ff]','dark:bg-[#04132b]');
+        bubble.style.borderRadius = '12px';
+        bubble.style.textAlign = 'left';
+      }
+
+      // Use marked for markdown rendering for assistant messages. For user messages, show plain text but allow markdown preview optionally.
+      if(role === 'assistant'){
+        // create inner div for HTML
+        const md = document.createElement('div');
+        md.className = 'prose max-w-none text-sm';
+        try{
+          md.innerHTML = marked.parse(content || '');
+        }catch(e){
+          md.textContent = content;
+        }
+        bubble.appendChild(md);
+      }else{
+        // user
+        const md = document.createElement('div');
+        md.className = 'text-sm';
+        md.textContent = content;
+        bubble.appendChild(md);
+      }
+
+      wrap.appendChild(bubble);
+      messagesEl.appendChild(wrap);
+
+      // For returning when streaming we need to access the bubble
+      return bubble;
+    }
+
+    // Scroll to bottom
+    function scrollToBottom(jump=false){
+      try{
+        if(jump) messagesWrap.scrollTop = messagesWrap.scrollHeight;
+        else messagesWrap.scrollTo({ top: messagesWrap.scrollHeight, behavior:'smooth' });
+      }catch(e){}
+    }
+
+    // Send message handler
+    async function onSend(){
+      const text = inputBox.value.trim();
+      if(!text){
+        inputBox.value = '';
+        inputBox.focus();
+        return;
+      }
+      // Add user message to state
+      const chat = state.chats.find(c => c.id === state.activeChatId);
+      if(!chat) return alert('No active chat.');
+      const userMsg = { role:'user', content: text, createdAt: nowISO() };
+      chat.messages.push(userMsg);
+      saveStateToStorage();
+
+      // Render user message
+      appendMessageToDOM('user', text);
+      inputBox.value = '';
+      inputBox.focus();
+      renderChats();
+
+      // Make assistant placeholder
+      const assistantPlaceholder = { role:'assistant', content: '' };
+      chat.messages.push(assistantPlaceholder);
+      saveStateToStorage();
+
+      // Render assistant bubble and stream into it
+      const assistantEl = appendMessageToDOM('assistant', '');
+      assistantEl.classList.add('typing-cursor');
+
+      // Start streaming
+      try{
+        await streamAssistantResponse(chat, assistantEl, userMsg);
+      }catch(err){
+        console.error('Streaming error', err);
+        // replace placeholder with error
+        assistantEl.classList.remove('typing-cursor');
+        assistantEl.innerHTML = '<div class="text-xs text-red-600">Error: ' + escapeHtml(String(err.message || err)) + '</div>';
+      }finally{
+        assistantEl.classList.remove('typing-cursor');
+        stopBtn.classList.add('hidden');
+      }
+    }
+
+    // Compose messages for API including system prompts
+    function buildMessagesForAPI(chat, latestUserMessage){
+      const messages = [];
+      // system: per-chat then global
+      if(chat.systemPrompt && chat.systemPrompt.trim()){
+        messages.push({ role:'system', content: chat.systemPrompt.trim() });
+      }else if(state.globalSystem && state.globalSystem.trim()){
+        messages.push({ role:'system', content: state.globalSystem.trim() });
+      }
+      // all previous messages except the last assistant placeholder
+      (chat.messages || []).forEach(m => {
+        if(m.role && m.content){
+          // skip the last assistant placeholder (empty) if exists
+          messages.push({ role: m.role, content: m.content });
+        }
+      });
+      // Ensure latest user message present - already included as it's added to chat.messages before calling
+      return messages;
+    }
+
+    // Streaming assistant response using fetch + ReadableStream
+    async function streamAssistantResponse(chat, assistantEl, userMsg){
+      // Defensive: ensure api key present
+      const apiKey = state.apiKey || (localStorage.getItem(LS.apiKey) || '');
+      if(!apiKey){
+        assistantEl.innerHTML = '<div class="text-sm text-red-600">Missing OpenRouter API key. Open Settings to provide your key.</div>';
+        return;
+      }
+
+      // Construct payload
+      const payload = {
+        model: state.model || (localStorage.getItem(LS.model) || 'deepseek/deepseek-r1:free'),
+        messages: buildMessagesForAPI(chat, userMsg),
+        stream: true,
+        max_tokens: 1500,
+        temperature: 0.2,
+      };
+
+      // show stop button
+      stopBtn.classList.remove('hidden');
+
+      // Abort controller for stop
+      const controller = new AbortController();
+      state.streamingController = controller;
+
+      // Begin fetch
+      const url = 'https://openrouter.ai/api/v1/chat/completions';
+      let response;
+      try{
+        response = await fetch(url, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': 'Bearer ' + apiKey,
+          },
+          body: JSON.stringify(payload),
+          signal: controller.signal
+        });
+      }catch(err){
+        state.streamingController = null;
+        stopBtn.classList.add('hidden');
+        throw err;
+      }
+
+      if(!response.ok){
+        state.streamingController = null;
+        stopBtn.classList.add('hidden');
+        const text = await response.text().catch(()=> '');
+        throw new Error('API Error: ' + response.status + ' ' + (text || response.statusText));
+      }
+
+      // If response is not streaming (some endpoints), parse JSON and display
+      const ct = response.headers.get('content-type') || '';
+      if(!response.body){
+        // fallback
+        const data = await response.json();
+        const txt = (data?.choices && data.choices[0] && data.choices[0].message && data.choices[0].message.content) || JSON.stringify(data);
+        assistantEl.innerHTML = marked.parse(txt);
+        state.streamingController = null;
+        // Update chat message content in state
+        const last = chat.messages[chat.messages.length - 1];
+        if(last && last.role === 'assistant') last.content = txt;
+        saveStateToStorage();
+        renderChats();
+        return;
+      }
+
+      // Stream parser for either SSE-like "data: ..." or raw text chunks
+      const reader = response.body.getReader();
+      const decoder = new TextDecoder('utf-8');
+      let done = false;
+      let buffer = '';
+      let assembled = '';
+
+      // Helper to flush chunk text into DOM with letter-by-letter effect
+      function flushToDOM(textChunk){
+        if(!textChunk) return;
+        // We'll append characters progressively to show typing animation.
+        // But to keep it performant, append in small batches.
+        let i = 0;
+        const step = () => {
+          if(i >= textChunk.length) return;
+          const nextBatch = textChunk.slice(i, i + 8); // 8 chars per frame
+          i += nextBatch.length;
+          // append as markdown parse for safety? We'll append raw text and re-render markdown on intervals.
+          // Simpler: maintain plain text and periodically render via marked.
+          assembled += nextBatch;
+          // Render markdown safely
+          try{
+            assistantEl.innerHTML = marked.parse(assembled);
+          }catch(e){
+            assistantEl.textContent = assembled;
+          }
+          // schedule next
+          requestAnimationFrame(step);
+        };
+        step();
+      }
+
+      // Many streaming APIs send "data: {json}\n\n" lines. We'll handle both cases.
+      while(!done){
+        let res;
+        try{
+          res = await reader.read();
+        }catch(err){
+          // aborted or network error
+          done = true;
+          break;
+        }
+        if(res.done){
+          done = true;
+          break;
+        }
+        const chunk = decoder.decode(res.value || new Uint8Array(), { stream: true });
+        buffer += chunk;
+
+        // Try to parse "data: " lines
+        let lines = buffer.split(/\r\n|\n/);
+        // Keep the last partial line in buffer
+        if(!buffer.endsWith("\n")) {
+          buffer = lines.pop();
+        } else {
+          buffer = '';
+        }
+
+        for(const rawLine of lines){
+          if(!rawLine) continue;
+          // Typical SSE: "data: [json]" or "data: [text]"
+          const line = rawLine.trim();
+          if(line.startsWith('data:')){
+            const payloadStr = line.replace(/^data:\s*/, '');
+            if(payloadStr === '[DONE]') {
+              done = true;
+              break;
+            }
+            try{
+              const j = JSON.parse(payloadStr);
+              // Try to locate incremental token in common positions
+              let token = '';
+              // openrouter usually returns {id, object, choices: [{delta: {content: "..."}}]}
+              if(j.choices && Array.isArray(j.choices)){
+                const c = j.choices[0];
+                if(c.delta && (c.delta.content || c.delta.role)){
+                  token = c.delta.content || '';
+                }else if(c.text){
+                  token = c.text;
+                }else if(c.message && c.message.content){
+                  token = c.message.content;
                 }
-
-                loadData();
-                bindEvents();
-                render();
-            }
-
-            /**
-             * Safely load data from localStorage with try/catch
-             */
-            function loadData() {
-                try {
-                    const stored = localStorage.getItem(STORAGE_KEY);
-                    if (stored) {
-                        const parsed = JSON.parse(stored);
-                        // Ensure parsed data is actually an array
-                        if (Array.isArray(parsed)) {
-                            state.items = parsed.filter(item => 
-                                item && typeof item.id === 'number' && typeof item.text === 'string'
-                            );
-                        }
-                    }
-                } catch (error) {
-                    console.warn('[App Storage] Failed to parse local storage, resetting state.', error);
-                    state.items = [];
+              }else if(j.text){
+                token = j.text;
+              }
+              if(token){
+                flushToDOM(token);
+                // update last assistant content in state incrementally
+                const last = chat.messages[chat.messages.length - 1];
+                if(last && last.role === 'assistant'){
+                  last.content = assembled;
                 }
+                saveStateToStorage();
+                scrollToBottom();
+              }
+            }catch(e){
+              // not json: flush raw
+              flushToDOM(payloadStr);
+              const last = chat.messages[chat.messages.length - 1];
+              if(last && last.role === 'assistant') last.content = assembled;
+              saveStateToStorage();
+              scrollToBottom();
             }
+          } else {
+            // Not data: line — assume raw text chunk; flush it
+            flushToDOM(line + '\n');
+            const last = chat.messages[chat.messages.length - 1];
+            if(last && last.role === 'assistant') last.content = assembled;
+            saveStateToStorage();
+            scrollToBottom();
+          }
+        }
+      } // end while
 
-            /**
-             * Safely save data to localStorage with try/catch (handles Private Browsing limits)
-             */
-            function saveData() {
-                try {
-                    localStorage.setItem(STORAGE_KEY, JSON.stringify(state.items || []));
-                } catch (error) {
-                    console.warn('[App Storage] Failed to save to local storage (quota exceeded or disabled).', error);
-                }
+      // Finalize: read remaining buffer (if any)
+      if(buffer){
+        const leftover = buffer;
+        buffer = '';
+        try{
+          // try parse leftover
+          if(leftover.startsWith('data:')){
+            const payloadStr = leftover.replace(/^data:\s*/, '');
+            if(payloadStr !== '[DONE]'){
+              try{
+                const j = JSON.parse(payloadStr);
+                let token = '';
+                if(j.choices && Array.isArray(j.choices)){
+                  const c = j.choices[0];
+                  token = (c.delta && c.delta.content) || c.text || (c.message && c.message.content) || '';
+                }else if(j.text) token = j.text;
+                if(token) flushToDOM(token);
+              }catch(e){
+                flushToDOM(payloadStr);
+              }
             }
+          }else{
+            flushToDOM(leftover);
+          }
+        }catch(e){}
+      }
 
-            /**
-             * Bind event listeners defensively
-             */
-            function bindEvents() {
-                // Form submission
-                elements.form.addEventListener('submit', function(event) {
-                    // Always prevent default to stop page reloads
-                    if (event && typeof event.preventDefault === 'function') {
-                        event.preventDefault();
-                    }
+      // Close out
+      state.streamingController = null;
+      stopBtn.classList.add('hidden');
 
-                    // Double check input exists
-                    if (!elements.input) return;
+      // Ensure state contains final assembled content
+      const lastMsg = chat.messages[chat.messages.length - 1];
+      if(lastMsg && lastMsg.role === 'assistant') lastMsg.content = assembled;
+      saveStateToStorage();
+      renderChats();
+      scrollToBottom(true);
+      return;
+    }
 
-                    const rawValue = elements.input.value;
-                    const cleanValue = typeof rawValue === 'string' ? rawValue.trim() : '';
+    // Open settings modal
+    function openSettings(){
+      settingsModal.classList.remove('hidden');
+      // populate current values
+      apiKeyInput.value = state.apiKey || (localStorage.getItem(LS.apiKey) || '');
+      modelInput.value = state.model || '';
+      globalSystemPromptEl.value = state.globalSystem || '';
+    }
+    function closeSettingsModal(){
+      settingsModal.classList.add('hidden');
+    }
 
-                    if (!cleanValue) {
-                        // Optional: show a visual cue, but returning prevents blank entries safely
-                        return;
-                    }
+    // On load run init
+    try{
+      init();
+    }catch(e){
+      console.error('App failed to start', e);
+      loading.textContent = 'Failed to start app — open console for details.';
+    }
 
-                    addItem(cleanValue);
-                    
-                    // Reset input safely
-                    try {
-                        elements.input.value = '';
-                        elements.input.focus();
-                    } catch (e) {
-                        console.warn('[App UI] Could not reset or focus input.', e);
-                    }
-                });
+    // Safety: ensure input always visible on focus (mobile)
+    inputBox.addEventListener('focus', () => {
+      setTimeout(()=> {
+        // Scroll to bottom to reveal input
+        scrollToBottom(true);
+      }, 300);
+    });
 
-                // Event delegation for delete buttons
-                elements.list.addEventListener('click', function(event) {
-                    if (!event || !event.target) return;
-                    
-                    const target = event.target;
-                    
-                    if (target.matches && target.matches('.delete-btn')) {
-                        // Extract ID safely using dataset
-                        const idRaw = target.getAttribute('data-id');
-                        if (!idRaw) return;
-                        
-                        const id = parseInt(idRaw, 10);
-                        if (!isNaN(id)) {
-                            deleteItem(id);
-                        }
-                    }
-                });
-            }
+    // Ensure messagesWrap is focusable for accessibility
+    messagesWrap.addEventListener('keydown', (e)=> {
+      if(e.key === 'ArrowDown') scrollToBottom();
+    });
 
-            /**
-             * Add a new item to state
-             */
-            function addItem(text) {
-                if (!text || typeof text !== 'string') return;
-                
-                state.items.push({
-                    id: Date.now(),
-                    text: text
-                });
-                
-                saveData();
-                render();
-            }
+    // Expose minimal debug for console
+    window.__UAIC = {
+      state,
+      saveStateToStorage,
+      loadStateFromStorage,
+      renderChats,
+      renderActiveChat
+    };
 
-            /**
-             * Delete item by ID
-             */
-            function deleteItem(id) {
-                if (typeof id !== 'number') return;
-                
-                state.items = (state.items || []).filter(function(item) {
-                    return item && item.id !== id;
-                });
-                
-                saveData();
-                render();
-            }
-
-            /**
-             * Escape HTML to prevent XSS attacks when rendering text
-             */
-            function escapeHTML(str) {
-                if (typeof str !== 'string') return '';
-                return str
-                    .replace(/&/g, "&amp;")
-                    .replace(/</g, "&lt;")
-                    .replace(/>/g, "&gt;")
-                    .replace(/"/g, "&quot;")
-                    .replace(/'/g, "&#039;");
-            }
-
-            /**
-             * Render state to DOM safely
-             */
-            function render() {
-                if (!elements.list) return;
-
-                // Handle empty state gracefully
-                if (!Array.isArray(state.items) || state.items.length === 0) {
-                    elements.list.innerHTML = '
-No tasks yet. Add one above!
-';
-                    return;
-                }
-
-                // Build HTML string efficiently
-                let html = '';
-                
-                for (let i = 0; i < state.items.length; i++) {
-                    const item = state.items[i];
-                    // Defensive check per item
-                    if (!item || typeof item.text !== 'string' || typeof item.id !== 'number') continue;
-                    
-                    const safeText = escapeHTML(item.text);
-                    const safeId = item.id;
-                    
-                    html += `
-                        <li>
-                            <span>${safeText}</span>
-                            <button 
-                                class="delete-btn" 
-                                data-id="${safeId}"
-                                aria-label="Delete task: ${safeText}"
-                            >
-                                Delete
-                            </button>
-                        </li>
-                    `;
-                }
-
-                // Safely apply to DOM
-                try {
-                    elements.list.innerHTML = html;
-                } catch (error) {
-                    console.error('[App Render] Failed to update DOM.', error);
-                    elements.list.innerHTML = '
-Error rendering tasks.
-';
-                }
-            }
-
-            // Ensure DOM is fully loaded before executing
-            if (document.readyState === 'loading') {
-                document.addEventListener('DOMContentLoaded', init);
-            } else {
-                init();
-            }
-            
-        })();
-    </script>
+  })();
+  </script>
 </body>
-</html>
-Show quoted text
-
+                </html>
